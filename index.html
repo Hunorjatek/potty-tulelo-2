@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pötty Túlélő 2</title>
+<style>
+:root{--sw:min(calc(100vw - 16px),calc((100vh - 44px)*1.5));--y:#ffd23f}
+html,body{height:100%;margin:0;background:#0f1117;color:#e8e8ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+#wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:8px;box-sizing:border-box}
+#stage{position:relative;width:var(--sw);height:calc(var(--sw)/1.5);flex:none;font-size:clamp(11px,calc(var(--sw)*.022),20px)}
+canvas{width:100%;height:100%;display:block;border-radius:12px;box-shadow:0 0 0 2px #2c3040;touch-action:none;background:radial-gradient(circle at center,#20242f,#101218)}
+#hud{position:absolute;top:8px;left:8px;display:none;gap:1.2em;font-weight:600;padding:.4em .9em;background:rgba(24,27,34,.78);border-radius:10px;box-shadow:0 0 0 2px #3a3f4c;color:#fff;pointer-events:none}
+#stage[data-s=playing] #hud,#stage[data-s=paused] #hud,#stage[data-s=menu] #hud{display:flex}
+#stage[data-s=menu] .gm{display:none}
+.label{opacity:.65;margin-right:4px}
+#hint{opacity:.55;font-size:.75rem;height:22px;line-height:22px;flex:none;text-align:center}
+.panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;flex-direction:column;align-items:center;gap:10px;
+  background:rgba(24,27,34,.92);color:#fff;padding:22px 32px;border-radius:14px;min-width:230px;max-width:90%;box-sizing:border-box;
+  text-align:center;box-shadow:0 0 0 2px #3a3f4c,0 4px 14px rgba(0,0,0,.4)}
+.panel.show{display:flex}
+.ttl{font-size:1.3rem;font-weight:800;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+.sub{color:#d7dae2;font-size:.85rem;margin-bottom:4px}
+.btn{width:100%;padding:10px 20px;border:none;border-radius:8px;background:var(--y);color:#1a1a1a;font-weight:700;font-size:1rem;cursor:pointer}
+.btn.sec{background:rgba(24,27,34,.85);color:#f5f6fa;box-shadow:0 0 0 2px #ffffff88}
+.btn:focus-visible,.flag:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#settings{width:min(94%,460px);gap:8px;padding:16px 22px}
+.row{width:100%;display:flex;flex-direction:row;gap:12px;align-items:center;justify-content:space-between;padding:6px 14px;border-radius:10px;box-shadow:0 0 0 2px #ffffff55;box-sizing:border-box}
+.row b{font-size:.9rem;white-space:nowrap;text-align:left}
+.row .sub{margin:0;min-width:40px;text-align:right}
+#vol{flex:1;min-width:80px;max-width:230px;margin:0;accent-color:var(--y);cursor:pointer}
+.tog{padding:5px 22px;border:none;border-radius:8px;font-weight:800;cursor:pointer;background:#555b6b;color:#fff}
+.tog.on{background:#2ecc71;color:#10151a}
+.flags{display:flex;gap:10px}
+.flag{width:36px;height:36px;border-radius:50%;padding:3px;border:3px solid transparent;background:none;cursor:pointer;overflow:hidden;box-sizing:border-box}
+.flag svg{width:100%;height:100%;border-radius:50%;display:block}
+.flag.sel{border-color:#2ecc71}
+.pad{position:absolute;bottom:10px;display:none;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:4px}
+#padL{left:10px}#padR{right:10px}
+.tb{width:46px;height:46px;border-radius:50%;border:2px solid #ffffffaa;background:rgba(24,27,34,.6);color:#fff;font-size:1.2rem;padding:0;touch-action:none;user-select:none;-webkit-user-select:none}
+.tb:active{background:rgba(255,255,255,.3)}
+#tPause{position:absolute;right:10px;top:10px;display:none;width:40px;height:40px}
+#tNitro,#tHeal{position:absolute;bottom:10px;transform:translateX(-50%);display:none}
+#tNitro{left:calc(50% - 28px);border-color:#a8d8ff}
+#tHeal{left:calc(50% + 28px);border-color:#ff9aa2}
+#toast{z-index:5;position:absolute;top:3.4em;left:50%;transform:translateX(-50%);padding:.45em 1.1em;border-radius:10px;background:rgba(24,27,34,.9);color:#fff;font-weight:700;box-shadow:0 0 0 2px #ffd23f;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap}
+#toast.show{opacity:1}
+#shop{width:min(94%,460px);gap:.6em;padding:1em 1.3em}
+#shop .ttl{font-size:1.4em}
+#shop .btn{font-size:1em;padding:.55em 1em}
+.cards{display:flex;gap:.7em;width:100%}
+.card{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:.4em;padding:.7em .6em;border-radius:10px;box-shadow:0 0 0 2px #ffffff55;box-sizing:border-box}
+.bn{font-weight:800;font-size:.95em}
+.pv{width:100%;height:auto;aspect-ratio:160/70;background:rgba(0,0,0,.28);border-radius:8px}
+.bd{font-size:.72em;color:#d7dae2;min-height:3.2em;line-height:1.3}
+.price{font-weight:700;color:var(--y);font-size:.9em}
+.buy{width:100%;padding:.5em;border:none;border-radius:8px;font-weight:800;font-size:.95em;cursor:pointer;background:#2ecc71;color:#10151a}
+.buy.owned{background:#555b6b;color:#c7cad3;cursor:default}
+.codeBox{display:flex;gap:6px;flex:1;max-width:270px}
+#codeIn{flex:1;min-width:0;padding:6px 8px;border-radius:8px;border:2px solid #ffffff55;background:#0f1117;color:#fff;font-size:.9rem;font-family:inherit}
+#codeIn:focus-visible{outline:2px solid var(--y);outline-offset:1px}
+.use{width:100%;padding:.3em;border-radius:8px;border:2px solid #ffffff55;background:none;color:#fff;font-size:.8em;cursor:pointer;visibility:hidden}
+.use.on{border-color:#2ecc71;color:#2ecc71}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="c" width="720" height="480"></canvas>
+    <div id="hud">
+      <div><span class="label" id="scoreL"></span><span id="score">0</span></div>
+      <div class="gm"><span class="label" data-i="lives"></span><span id="hearts"></span></div>
+      <div class="gm"><span class="label" data-i="nitro"></span><span id="nitroS">⚡</span></div>
+    </div>
+
+    <div id="toast"></div>
+
+    <div class="panel" id="menu">
+      <div class="ttl" data-i="title"></div>
+      <div class="sub" data-i="sub"></div>
+      <button class="btn" id="startBtn" data-i="start"></button>
+      <button class="btn sec" id="shopBtn" data-i="shop"></button>
+      <button class="btn sec" id="setBtn" data-i="settings"></button>
+    </div>
+
+    <div class="panel" id="pause">
+      <div class="ttl" data-i="paused"></div>
+      <button class="btn" id="resumeBtn" data-i="resume"></button>
+      <button class="btn sec" id="setBtn2" data-i="settings"></button>
+      <button class="btn sec" id="menuBtn2" data-i="menu"></button>
+    </div>
+
+    <div class="panel" id="over">
+      <div class="ttl" id="overText"></div>
+      <button class="btn" id="retryBtn" data-i="retry"></button>
+      <button class="btn sec" id="menuBtn3" data-i="menu"></button>
+    </div>
+
+    <div class="panel" id="shop">
+      <div class="ttl" data-i="shop"></div>
+      <div class="cards">
+        <div class="card" data-b="country"><div class="bn">Country balls boundle</div><canvas class="pv" width="160" height="70"></canvas><div class="bd"></div><div class="price"></div><button class="buy"></button><button class="use"></button></div>
+        <div class="card" data-b="og"><div class="bn">OG boundle</div><canvas class="pv" width="160" height="70"></canvas><div class="bd"></div><div class="price"></div><button class="buy"></button><button class="use"></button></div>
+      </div>
+      <button class="btn sec" id="shopBack" data-i="back"></button>
+    </div>
+
+    <div class="panel" id="settings">
+      <div class="ttl" data-i="settings"></div>
+      <div class="row"><b data-i="volume"></b><input type="range" id="vol" min="0" max="100" value="100"><span id="volL" class="sub"></span></div>
+      <div class="row"><b data-i="touch"></b><button class="tog" id="touchTog"></button></div>
+      <div class="row"><b data-i="lang"></b>
+        <div class="flags">
+          <button class="flag" id="fHu" title="Magyar"><svg viewBox="0 0 60 40" preserveAspectRatio="xMidYMid slice"><rect width="60" height="14" fill="#ce2939"/><rect y="13" width="60" height="14" fill="#fff"/><rect y="26" width="60" height="14" fill="#477050"/></svg></button>
+          <button class="flag" id="fEn" title="English"><svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice"><rect width="60" height="30" fill="#012169"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" stroke-width="3"/><path d="M30,0 v30 M0,15 h60" stroke="#fff" stroke-width="10"/><path d="M30,0 v30 M0,15 h60" stroke="#C8102E" stroke-width="6"/></svg></button>
+        </div>
+      </div>
+      <div class="row"><b data-i="codes"></b><div class="codeBox"><input id="codeIn" type="text" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="tog on" id="codeBtn" data-i="redeem"></button></div></div>
+      <button class="btn sec" id="backBtn" data-i="back"></button>
+    </div>
+
+    <div class="pad" id="padL">
+      <button class="tb" data-k="w" style="grid-area:1/2">▲</button>
+      <button class="tb" data-k="a" style="grid-area:2/1">◀</button>
+      <button class="tb" data-k="d" style="grid-area:2/3">▶</button>
+      <button class="tb" data-k="s" style="grid-area:3/2">▼</button>
+    </div>
+    <div class="pad" id="padR">
+      <button class="tb" data-k="arrowup" style="grid-area:1/2">▲</button>
+      <button class="tb" data-k="arrowleft" style="grid-area:2/1">◀</button>
+      <button class="tb" data-k="arrowright" style="grid-area:2/3">▶</button>
+      <button class="tb" data-k="arrowdown" style="grid-area:3/2">▼</button>
+    </div>
+    <button class="tb" id="tPause">⏸</button>
+    <button class="tb" id="tNitro" data-k="e">⚡</button>
+    <button class="tb" id="tHeal">❤️</button>
+  </div>
+  <div id="hint" data-i="hint"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id), cv=$('c'), ctx=cv.getContext('2d'), W=720, H=480;
+const rand=(a,b)=>a+Math.random()*(b-a);
+
+// --- Mentett adatok ---
+let settings={volume:100,touch:false,lang:'hu'}, best=0, total=0;
+try{
+  const s=JSON.parse(localStorage.getItem('pt2Settings')||'null');
+  if(s){ if(typeof s.volume==='number')settings.volume=Math.max(0,Math.min(100,s.volume));
+    if(typeof s.touch==='boolean')settings.touch=s.touch; if(s.lang==='hu'||s.lang==='en')settings.lang=s.lang; }
+  best=+localStorage.getItem('pt2Best5')||0;total=+localStorage.getItem('pt2Total')||0;
+}catch(e){}
+const BUNDLES={country:{price:1000},og:{price:5000}};
+let shop={owned:{country:false,og:false},equip:null};
+try{
+  const sh=JSON.parse(localStorage.getItem('pt2Shop')||'null');
+  if(sh){for(const k in BUNDLES)shop.owned[k]=!!(sh.owned&&sh.owned[k]===true); if(shop.owned[sh.equip])shop.equip=sh.equip;}
+}catch(e){}
+const saveShop=()=>{try{localStorage.setItem('pt2Shop',JSON.stringify(shop));}catch(e){}};
+const saveTotal=()=>{try{localStorage.setItem('pt2Total',total);}catch(e){}};
+const CODES={HUNOR:10000};
+let redeemed=[];
+try{const r=JSON.parse(localStorage.getItem('pt2Codes')||'[]');if(Array.isArray(r))redeemed=r.filter(c=>c in CODES);}catch(e){}
+const saveSettings=()=>{try{localStorage.setItem('pt2Settings',JSON.stringify(settings));}catch(e){}};
+
+// --- Nyelvek ---
+const I18N={
+  hu:{title:'🔴 Pötty Túlélő 2',sub:'Lődd le a kékeket, mielőtt elérnek!',start:'Indítás',settings:'Beállítások',paused:'⏸️ Szünet',
+    resume:'Folytatás',menu:'Főmenü',retry:'Újra',score:'Pontok:',codes:'Kódok 🔑',redeem:'Beváltás',codePh:'Kód...',codeOk:'Sikeresen kaptál 10 000 pontot!',codeBad:'Ilyen kód nem létezik!',codeUsed:'Ezt a kódot már beváltottad!',shop:'Bolt 🛒',buy:'Vásárlás',owned:'Megvéve',equip:'Használat',using:'✔ Használatban',pts:p=>`${p} pont`,d_country:'Magyar pötty, az ellenfelek orosz, ukrán és iráni zászlót kapnak',d_og:'Letisztult, kontúros pöttyök a játékosnak és az ellenfeleknek',total:'Összes pont:',noPts:'Nincs elég pontod!',fullHp:'Már tele van az életed!',lives:'Élet:',nitro:'Nitró:',volume:'Hangerő 🔊',touch:'Érintős vezérlés 📱',
+    lang:'Nyelv 🌐',back:'Vissza ◀️',on:'Be',off:'Ki',hint:'WASD: mozgás — Nyilak: lövés — E: nitró — Szóköz: élet — Esc: szünet',
+    overNew:s=>`Vége! Pontszám: ${s} — Új rekord! 🏆`,overOld:(s,b)=>`Vége! Pontszám: ${s} (Rekord: ${b})`},
+  en:{title:'🔴 Dot Survivor 2',sub:'Shoot the blue dots before they reach you!',start:'Start',settings:'Settings',paused:'⏸️ Paused',
+    resume:'Resume',menu:'Main menu',retry:'Retry',score:'Points:',codes:'Codes 🔑',redeem:'Redeem',codePh:'Code...',codeOk:'You received 10,000 points!',codeBad:'That code does not exist!',codeUsed:'You already redeemed this code!',shop:'Shop 🛒',buy:'Buy',owned:'Owned',equip:'Equip',using:'✔ Equipped',pts:p=>`${p} pts`,d_country:'Hungarian dot, enemies get Russian, Ukrainian and Iranian flags',d_og:'Clean, outlined dots for the player and the enemies',total:'Total points:',noPts:'Not enough points!',fullHp:'Your lives are already full!',lives:'Lives:',nitro:'Nitro:',volume:'Volume 🔊',touch:'Touch controls 📱',
+    lang:'Language 🌐',back:'Back ◀️',on:'On',off:'Off',hint:'WASD: move — Arrows: shoot — E: nitro — Space: heal — Esc: pause',
+    overNew:s=>`Game over! Score: ${s} — New record! 🏆`,overOld:(s,b)=>`Game over! Score: ${s} (Record: ${b})`}
+};
+const t=(k,...a)=>{const v=I18N[settings.lang][k];return typeof v==='function'?v(...a):v;};
+function applyLang(){
+  document.documentElement.lang=settings.lang;
+  document.title=t('title').replace('🔴 ','');
+  document.querySelectorAll('[data-i]').forEach(el=>el.textContent=t(el.dataset.i));
+  $('fHu').classList.toggle('sel',settings.lang==='hu');
+  $('fEn').classList.toggle('sel',settings.lang==='en');
+  $('touchTog').textContent=settings.touch?t('on'):t('off');
+  $('touchTog').classList.toggle('on',settings.touch);
+  $('codeIn').placeholder=t('codePh');
+  refreshHud();
+  renderShop();
+}
+
+// --- Hangeffektek ---
+let audioCtx=null;
+function getCtx(){
+  if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  return audioCtx;
+}
+function beep({freq=440,duration=.1,type='sine',volume=.2,slideTo=null}={}){
+  if(settings.volume<=0)return;
+  volume*=settings.volume/100;
+  try{
+    const c=getCtx(), o=c.createOscillator(), g=c.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq,c.currentTime);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,c.currentTime+duration);
+    g.gain.setValueAtTime(volume,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+duration);
+    o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+duration);
+  }catch(e){}
+}
+const sfx={
+  shoot:()=>beep({freq:900,duration:.07,type:'square',volume:.07,slideTo:350}),
+  kill:()=>beep({freq:420,duration:.12,type:'triangle',volume:.2,slideTo:900}),
+  hit:()=>beep({freq:200,duration:.22,type:'sawtooth',volume:.25,slideTo:60}),
+  gameover:()=>beep({freq:320,duration:.5,type:'square',volume:.2,slideTo:70}),
+  click:()=>beep({freq:600,duration:.05,type:'square',volume:.12}),
+  nitro:()=>beep({freq:180,duration:.28,type:'sawtooth',volume:.16,slideTo:1000}),
+  nitroEnd:()=>beep({freq:700,duration:.3,type:'triangle',volume:.13,slideTo:140}),
+  heal:()=>[523.25,659.25,880].forEach((f,i)=>setTimeout(()=>beep({freq:f,duration:.14,type:'triangle',volume:.2}),i*90)),
+  deny:()=>[0,130].forEach(d=>setTimeout(()=>beep({freq:170,duration:.1,type:'square',volume:.14}),d))
+};
+
+// --- Háttérzene: nyugodt a menüben, pörgős a játékban ---
+const TRACKS={
+  menu:{step:.6,type:'sine',vol:.05,
+    lead:[220,329.63,392,329.63,261.63,329.63,293.66,246.94],
+    bass:[110,0,0,0,98,0,0,0]},
+  game:{step:.14,type:'square',vol:.028,
+    lead:[440,440,523.25,440,659.25,440,587.33,523.25,392,392,493.88,392,587.33,392,523.25,493.88],
+    bass:[110,110,110,110,110,110,110,110,98,98,98,98,98,98,98,98]}
+};
+let musicTimer=null, currentMusic=null, wantMusic='menu', unlocked=false;
+function playMusic(name){
+  wantMusic=name;
+  if(!unlocked)return;
+  if(name===null){clearTimeout(musicTimer);currentMusic=null;return;}
+  if(currentMusic===name)return;
+  clearTimeout(musicTimer); currentMusic=name;
+  const tr=TRACKS[name]; let i=0;
+  (function step(){
+    if(currentMusic!==name)return;
+    beep({freq:tr.lead[i%tr.lead.length],duration:tr.step*.85,type:tr.type,volume:tr.vol});
+    const b=tr.bass[i%tr.bass.length];
+    if(b){
+      if(name==='game')beep({freq:b/2,duration:tr.step*.9,type:'sawtooth',volume:.05});
+      else beep({freq:b,duration:tr.step*5,type:'sine',volume:.06});
+    }
+    if(name==='game'&&i%4===0)beep({freq:130,duration:.1,type:'sine',volume:.14,slideTo:45});
+    i++; musicTimer=setTimeout(step,tr.step*1000);
+  })();
+}
+function unlock(){ if(unlocked)return; unlocked=true; getCtx(); playMusic(wantMusic); }
+addEventListener('pointerdown',unlock,{once:true});
+addEventListener('keydown',unlock,{once:true});
+
+// --- Menüháttér: csillagos ég, fehér lövedék-csíkokkal ---
+const stars=Array.from({length:90},()=>({x:rand(0,W),y:rand(0,H),z:rand(.3,1),p:rand(0,6.28)}));
+let streaks=[];
+function drawIdle(dt,now){
+  const sh=Math.sin(now/5000)*40, g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,`hsl(${225+sh},55%,9%)`); g.addColorStop(1,`hsl(${285+sh},50%,16%)`);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  for(const s of stars){
+    s.x-=22*s.z*dt; if(s.x<0){s.x=W;s.y=rand(0,H);}
+    ctx.globalAlpha=.35+.4*Math.sin(now/600+s.p)**2;
+    ctx.fillStyle='#fff'; ctx.fillRect(s.x,s.y,1+s.z*2,1+s.z*2);
+  }
+  if(Math.random()<dt*1.2){
+    const a=[[1,0],[-1,0],[0,1],[0,-1]][Math.floor(rand(0,4))];
+    streaks.push({x:rand(0,W),y:rand(0,H),dx:a[0],dy:a[1],life:1});
+  }
+  ctx.lineWidth=3; ctx.lineCap='round'; ctx.strokeStyle='#fff';
+  streaks=streaks.filter(s=>{
+    s.x+=s.dx*380*dt; s.y+=s.dy*380*dt; s.life-=dt*.7;
+    ctx.globalAlpha=Math.max(0,s.life)*.6;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.dx*40,s.y-s.dy*40); ctx.stroke();
+    return s.life>0;
+  });
+  ctx.globalAlpha=1;
+}
+
+// --- Játék ---
+const MAX_LIVES=3, SPEED=220, BULLET_SPEED=560, COOLDOWN=500;
+const AIM={arrowup:[0,-1],arrowdown:[0,1],arrowleft:[-1,0],arrowright:[1,0]};
+let keys={}, lastArrow=null, state='menu', from='menu';
+let P,E,B,score,earned,lives,invUntil,nextShot,spawnT,elapsed,nitroOn,nitroT,nitroCd,trail;
+
+function refreshHud(){
+  $('scoreL').textContent=t(state==='menu'?'total':'score');
+  $('score').textContent=state==='menu'?total:score;
+}
+function bank(){
+  total+=score; score=0;
+  try{localStorage.setItem('pt2Total',total);}catch(e){}
+}
+function hearts(){ let s=''; for(let i=0;i<MAX_LIVES;i++)s+=i<lives?'❤️':'🖤'; $('hearts').textContent=s; }
+function spawnEnemy(){
+  let x,y,n=0;
+  do{
+    const e=Math.floor(rand(0,4));
+    x=e===0?0:e===1?W:rand(0,W); y=e===2?0:e===3?H:rand(0,H);
+  }while(Math.hypot(x-P.x,y-P.y)<160&&++n<10);
+  return{x,y,r:16,k:rand(.85,1.15),f:Math.floor(rand(0,3))};
+}
+function newGame(){
+  P={x:W/2,y:H/2,r:15};
+  E=[];B=[];score=0;lives=MAX_LIVES;invUntil=0;nextShot=0;spawnT=2;elapsed=0;earned=0;
+  nitroOn=false;nitroT=0;nitroCd=0;trail=[];
+  E.push(spawnEnemy(),spawnEnemy());
+  score=0; hearts(); $('toast').classList.remove('show');
+  show(''); setState('playing');
+}
+function aimDir(){
+  if(lastArrow&&keys[lastArrow])return AIM[lastArrow];
+  for(const k in AIM)if(keys[k])return AIM[k];
+  return null;
+}
+function update(dt,now){
+  elapsed+=dt;
+  if(nitroOn){
+    nitroT-=dt;
+    if(nitroT<=0){nitroOn=false;nitroCd=10;sfx.nitroEnd();}
+  }else if(nitroCd>0){
+    nitroCd=Math.max(0,nitroCd-dt);
+  }else if(keys.e){
+    nitroOn=true;nitroT=1;sfx.nitro();
+  }
+  if(nitroOn)trail.push({x:P.x,y:P.y,a:1});
+  for(const p of trail)p.a-=dt*3;
+  trail=trail.filter(p=>p.a>0);
+  const ns=nitroOn?'💨':nitroCd>0?Math.ceil(nitroCd)+' '+(settings.lang==='hu'?'mp':'s'):'⚡';
+  if($('nitroS').textContent!==ns)$('nitroS').textContent=ns;
+  const spd=SPEED*(nitroOn?2:1);
+  const dx=(keys.d?1:0)-(keys.a?1:0), dy=(keys.s?1:0)-(keys.w?1:0);
+  if(dx||dy){const l=Math.hypot(dx,dy);P.x+=dx/l*spd*dt;P.y+=dy/l*spd*dt;}
+  P.x=Math.max(P.r,Math.min(W-P.r,P.x)); P.y=Math.max(P.r,Math.min(H-P.r,P.y));
+
+  if(now>=nextShot){
+    const d=aimDir();
+    if(d){B.push({x:P.x,y:P.y,dx:d[0],dy:d[1]});nextShot=now+COOLDOWN;sfx.shoot();}
+  }
+
+  spawnT-=dt;
+  if(spawnT<=0){ if(E.length<30)E.push(spawnEnemy()); spawnT=Math.max(1,2.4-elapsed*.012); }
+  const sp=Math.min(95,45+earned*.7);
+  for(const e of E){
+    const a=Math.atan2(P.y-e.y,P.x-e.x);
+    e.x+=Math.cos(a)*sp*e.k*dt; e.y+=Math.sin(a)*sp*e.k*dt;
+  }
+  for(let i=0;i<E.length;i++)for(let j=i+1;j<E.length;j++){
+    const a=E[i],b=E[j],d=Math.hypot(a.x-b.x,a.y-b.y)||.01,m=a.r+b.r;
+    if(d<m){const px=(a.x-b.x)/d*(m-d)/2,py=(a.y-b.y)/d*(m-d)/2;a.x+=px;a.y+=py;b.x-=px;b.y-=py;}
+  }
+
+  for(let i=B.length-1;i>=0;i--){
+    const b=B[i]; b.x+=b.dx*BULLET_SPEED*dt; b.y+=b.dy*BULLET_SPEED*dt;
+    if(b.x<-30||b.x>W+30||b.y<-30||b.y>H+30){B.splice(i,1);continue;}
+    const hit=E.findIndex(e=>Math.hypot(e.x-b.x,e.y-b.y)<e.r+3||Math.hypot(e.x-(b.x-b.dx*14),e.y-(b.y-b.dy*14))<e.r+3);
+    if(hit>=0){E.splice(hit,1);B.splice(i,1);score+=5;earned+=5;refreshHud();sfx.kill();}
+  }
+
+  if(now>=invUntil){
+    for(const e of E){
+      if(Math.hypot(P.x-e.x,P.y-e.y)<P.r+e.r-3){
+        lives--; hearts(); sfx.hit();
+        const a=Math.atan2(P.y-e.y,P.x-e.x);
+        P.x=Math.max(P.r,Math.min(W-P.r,P.x+Math.cos(a)*60));
+        P.y=Math.max(P.r,Math.min(H-P.r,P.y+Math.sin(a)*60));
+        invUntil=now+1000;
+        if(lives<=0)gameOver();
+        break;
+      }
+    }
+  }
+}
+function drawGame(now){
+  ctx.clearRect(0,0,W,H);
+  ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#a8d8ff';ctx.lineWidth=P.r*1.6;
+  for(let i=1;i<trail.length;i++){
+    ctx.globalAlpha=Math.max(0,trail[i].a)*.35;
+    ctx.beginPath();ctx.moveTo(trail[i-1].x,trail[i-1].y);ctx.lineTo(trail[i].x,trail[i].y);ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  if(nitroOn){
+    ctx.strokeStyle='rgba(168,216,255,.45)';ctx.lineWidth=7;
+    ctx.beginPath();ctx.arc(P.x,P.y,P.r+7,0,7);ctx.stroke();
+  }
+  ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.lineCap='round';
+  for(const b of B){ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.dx*18,b.y-b.dy*18);ctx.stroke();}
+  for(const e of E)dot(ctx,e.x,e.y,e.r,false,e.f,shop.equip,false);
+  dot(ctx,P.x,P.y,P.r,true,0,shop.equip,now<invUntil&&Math.floor(now/100)%2===0);
+}
+const FLAGS={hu:['#ce2939','#fff','#477050'],ru:['#fff','#0039a6','#d52b1e'],ua:['#0057b7','#ffd700'],ir:['#239f40','#fff','#da0000']};
+const ENEMY_FLAGS=['ru','ua','ir'];
+function dot(c,x,y,r,player,f,skin,dim){
+  c.save();
+  if(skin==='country'){
+    const st=FLAGS[player?'hu':ENEMY_FLAGS[f%3]],h=2*r/st.length;
+    if(dim)c.globalAlpha=.5;
+    c.beginPath();c.arc(x,y,r,0,7);c.clip();
+    st.forEach((col,i)=>{c.fillStyle=col;c.fillRect(x-r,y-r+i*h,2*r,h+1);});
+    c.restore();c.save();if(dim)c.globalAlpha=.5;
+    c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1.5;c.beginPath();c.arc(x,y,r-.7,0,7);c.stroke();
+  }else if(skin==='og'){
+    const col=player?'#ff4757':'#3f8dff';
+    if(dim)c.globalAlpha=.5;
+    c.beginPath();c.arc(x,y,r-1.5,0,7);
+    c.fillStyle='#181b24';c.fill();
+    c.fillStyle=col+'2e';c.fill();
+    c.strokeStyle=col;c.lineWidth=3;c.stroke();
+    c.fillStyle=col;c.beginPath();c.arc(x,y,r*.28,0,7);c.fill();
+  }else{
+    c.fillStyle=player?(dim?'#ff9aa2':'#ff4757'):'#3f8dff';
+    c.beginPath();c.arc(x,y,r,0,7);c.fill();
+  }
+  c.restore();
+}
+function gameOver(){
+  setState('over'); sfx.gameover();
+  const isNew=earned>best;
+  if(isNew){best=earned;try{localStorage.setItem('pt2Best5',best);}catch(e){}}
+  $('overText').textContent=isNew?t('overNew',earned):t('overOld',earned,best);
+  bank();
+  show('over');
+}
+
+const HEAL_COST=25; let toastT=null;
+function toast(key){
+  const el=$('toast'); el.textContent=t(key); el.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1600);
+}
+function heal(){
+  if(state!=='playing')return;
+  if(lives>=MAX_LIVES){toast('fullHp');sfx.deny();}
+  else if(score<HEAL_COST){toast('noPts');sfx.deny();}
+  else{score-=HEAL_COST;lives++;hearts();refreshHud();sfx.heal();}
+}
+
+let last=0;
+function loop(now){
+  const dt=Math.min((now-last)/1000,.05); last=now;
+  if(state==='playing'){update(dt,now); if(state==='playing')drawGame(now);}
+  if(state==='over')drawGame(now);
+  else if(state!=='playing')drawIdle(dt,now);
+  requestAnimationFrame(loop);
+}
+
+// --- Menük és állapotok ---
+const panels=['menu','pause','settings','over','shop'];
+function show(name){panels.forEach(p=>$(p).classList.toggle('show',p===name));}
+function setState(s){
+  state=s;
+  $('stage').dataset.s=s;
+  refreshHud();
+  playMusic(s==='playing'?'game':s==='over'?null:'menu');
+  syncTouch();
+}
+function syncTouch(){
+  const on=settings.touch&&state==='playing';
+  $('padL').style.display=$('padR').style.display=on?'grid':'none';
+  $('tPause').style.display=on?'block':'none';
+  $('tNitro').style.display=$('tHeal').style.display=on?'block':'none';
+  if(!on&&!settings.touch)for(const k of ['w','a','s','d','e',...Object.keys(AIM)])keys[k]=false;
+}
+function toMenu(){ if(state==='paused')bank(); setState('menu'); show('menu'); }
+function openSettings(){ from=state==='paused'?'pause':'menu'; show('settings'); }
+function resume(){ show(''); setState('playing'); }
+function togglePause(){
+  if(state==='playing'){setState('paused');show('pause');}
+  else if(state==='paused'){ $('settings').classList.contains('show')?$('backBtn').click():resume(); }
+}
+
+const click=(id,fn)=>$(id).onclick=()=>{sfx.click();fn();};
+click('startBtn',newGame); click('retryBtn',newGame);
+click('setBtn',openSettings); click('setBtn2',openSettings);
+click('resumeBtn',resume);
+click('menuBtn2',toMenu); click('menuBtn3',toMenu);
+click('backBtn',()=>show(from));
+
+// --- Kódok ---
+function redeem(){
+  const code=$('codeIn').value.trim();
+  if(!(code in CODES)){toast('codeBad');sfx.deny();return;}
+  if(redeemed.includes(code)){toast('codeUsed');sfx.deny();return;}
+  redeemed.push(code); total+=CODES[code]; $('codeIn').value='';
+  try{localStorage.setItem('pt2Codes',JSON.stringify(redeemed));}catch(e){}
+  saveTotal(); refreshHud(); toast('codeOk'); sfx.heal();
+}
+$('codeBtn').onclick=redeem;
+
+// --- Bolt ---
+const cards=[...document.querySelectorAll('.card')];
+function preview(card){
+  const id=card.dataset.b,c=card.querySelector('canvas').getContext('2d');
+  c.clearRect(0,0,160,70);
+  dot(c,30,35,18,true,0,id,false);
+  for(let i=0;i<3;i++)dot(c,74+i*30,35,13,false,i,id,false);
+}
+function renderShop(){
+  cards.forEach(card=>{
+    const id=card.dataset.b,own=shop.owned[id],buy=card.querySelector('.buy'),use=card.querySelector('.use');
+    buy.textContent=t(own?'owned':'buy'); buy.classList.toggle('owned',own);
+    use.style.visibility=own?'visible':'hidden';
+    use.textContent=t(shop.equip===id?'using':'equip'); use.classList.toggle('on',shop.equip===id);
+    card.querySelector('.price').textContent=t('pts',BUNDLES[id].price);
+    card.querySelector('.bd').textContent=t('d_'+id);
+  });
+}
+cards.forEach(card=>{
+  const id=card.dataset.b; preview(card);
+  card.querySelector('.buy').onclick=()=>{
+    if(shop.owned[id])return;
+    if(total<BUNDLES[id].price){toast('noPts');sfx.deny();return;}
+    total-=BUNDLES[id].price; shop.owned[id]=true; shop.equip=id;
+    saveTotal(); saveShop(); refreshHud(); sfx.heal(); renderShop();
+  };
+  card.querySelector('.use').onclick=()=>{sfx.click();shop.equip=shop.equip===id?null:id;saveShop();renderShop();};
+});
+click('shopBtn',()=>{renderShop();show('shop');}); click('shopBack',()=>show('menu'));
+
+const vol=$('vol');
+function syncSettings(){vol.value=settings.volume;$('volL').textContent=settings.volume+'%';}
+vol.oninput=()=>{settings.volume=+vol.value;$('volL').textContent=settings.volume+'%';saveSettings();};
+vol.onchange=()=>sfx.click();
+click('touchTog',()=>{settings.touch=!settings.touch;saveSettings();applyLang();syncTouch();});
+click('fHu',()=>{settings.lang='hu';saveSettings();applyLang();});
+click('fEn',()=>{settings.lang='en';saveSettings();applyLang();});
+
+// --- Billentyűzet és érintés ---
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(e.target.id==='codeIn'&&k!=='escape'){if(k==='enter')redeem();return;}
+  if(k in AIM){e.preventDefault();lastArrow=k;}
+  if(k===' '){e.preventDefault();if(!e.repeat)heal();}
+  keys[k]=true;
+  if(k==='escape'&&!e.repeat)togglePause();
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+addEventListener('blur',()=>{keys={};});
+document.querySelectorAll('[data-k]').forEach(b=>{
+  const k=b.dataset.k;
+  b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;if(k in AIM)lastArrow=k;});
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,e=>{e.preventDefault();keys[k]=false;}));
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+});
+$('tHeal').addEventListener('pointerdown',e=>{e.preventDefault();heal();});
+$('tPause').addEventListener('pointerdown',e=>{e.preventDefault();togglePause();});
+
+syncSettings(); applyLang(); hearts(); toMenu();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
